@@ -187,6 +187,73 @@ await connection.invoke("Typing", "Bob123");
 }
 ```
 
+## Presence / Heartbeat System
+
+### Problem
+
+`OnDisconnectedAsync` alone does not reliably clear active users in cases like browser crash, laptop sleep, network loss, mobile network switching, or server restarts. Stale users can remain "online" indefinitely.
+
+### Solution: Client Heartbeat + Server Cleanup
+
+#### Client → Server: `Heartbeat()` hub method
+
+The UI sends a lightweight presence ping every **25 seconds**:
+
+```ts
+await connection.invoke("Heartbeat");
+```
+
+The server should update `LastSeenAt = UtcNow` for the calling user on each heartbeat.
+
+#### Server: `PresenceCleanupService` (Background Job)
+
+A hosted background service should run every **30–60 seconds** and:
+
+1. Query all users where `IsOnline == true && LastSeenAt < UtcNow - 60s`
+2. Set `IsOnline = false` for those stale users
+3. Broadcast `ActiveUsersUpdated` to all connected clients
+
+```csharp
+// Example: PresenceCleanupService.cs
+public class PresenceCleanupService : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            // Mark stale users offline (LastSeenAt > 60s ago)
+            // Broadcast ActiveUsersUpdated
+        }
+    }
+}
+```
+
+#### Recommended constants
+
+| Parameter          | Value |
+|--------------------|-------|
+| Heartbeat interval | 25s   |
+| Stale timeout      | 60s   |
+| Cleanup job cycle  | 30s   |
+
+### Client-side Lifecycle Handling
+
+The UI handles **every possible disconnect scenario**:
+
+| Event                | Handler                                   | Purpose                                         |
+|----------------------|-------------------------------------------|-------------------------------------------------|
+| `beforeunload`       | `connection.stop()`                       | Tab close, navigation, refresh (desktop)        |
+| `pagehide`           | `connection.stop()`                       | Tab close on mobile Safari / iOS                |
+| `visibilitychange`   | Pause/resume heartbeat; reconnect if dead | Mobile tab switch, app backgrounding            |
+| `freeze`             | `connection.stop()` + stop heartbeat      | Browser page freeze (bfcache)                   |
+| Logout button        | `connection.stop()` + clear session       | Explicit user logout                            |
+| Component unmount    | `connection.stop()` + clear intervals     | SPA route change / React cleanup                |
+| Freeze detection     | Reconnect if `setInterval` drift > 60s    | Laptop sleep / wake recovery                    |
+| `onreconnecting`     | Pause heartbeat                           | SignalR reconnect in progress                   |
+| `onreconnected`      | Resume heartbeat                          | SignalR reconnect complete                       |
+| `onclose`            | Stop heartbeat                            | Connection fully closed                          |
+
 ## Frontend Notes
 
 - Usernames must be `3-20` alphanumeric characters only.

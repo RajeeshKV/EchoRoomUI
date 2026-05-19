@@ -2,6 +2,10 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { config } from '../config';
 
+// ── Presence / heartbeat constants ──────────────────────────────
+const HEARTBEAT_INTERVAL_MS = 25_000;   // send heartbeat every 25 s
+const FREEZE_THRESHOLD_MS   = 60_000;   // if loop was frozen > 60 s → reconnect
+
 export function useChat() {
   // Restore session from storage
   const stored = sessionStorage.getItem('echoroom_session');
@@ -22,6 +26,65 @@ export function useChat() {
   const connectionRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const privateTypingTimeoutRef = useRef(null);
+  const heartbeatRef = useRef(null);
+  const lastHeartbeatTsRef = useRef(Date.now());
+  const tokenRef = useRef(initial.token || null);   // stable ref for event handlers
+
+  // ── Helpers: stop heartbeat ───────────────────────────────────
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+  }, []);
+
+  // ── Helpers: start heartbeat ──────────────────────────────────
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat();
+    lastHeartbeatTsRef.current = Date.now();
+
+    heartbeatRef.current = setInterval(async () => {
+      const conn = connectionRef.current;
+      if (!conn || conn.state !== signalR.HubConnectionState.Connected) return;
+
+      // Detect freeze / laptop wake – if timer drifted beyond threshold, reconnect
+      const now = Date.now();
+      const elapsed = now - lastHeartbeatTsRef.current;
+      if (elapsed > FREEZE_THRESHOLD_MS) {
+        console.warn('[EchoRoom] Freeze detected – elapsed', elapsed, 'ms. Reconnecting…');
+        stopHeartbeat();
+        try { await conn.stop(); } catch { /* ignore */ }
+        // Trigger fresh reconnect using stored token
+        const savedToken = tokenRef.current;
+        if (savedToken) {
+          // Small delay to let the old socket fully close
+          setTimeout(() => connectHub(savedToken), 500);
+        }
+        return;
+      }
+      lastHeartbeatTsRef.current = now;
+
+      try {
+        await conn.invoke('Heartbeat');
+      } catch {
+        // Heartbeat failed – connection may be dead; SignalR auto-reconnect handles it
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }, [stopHeartbeat]);
+
+  // ── Graceful disconnect helper (sync-safe) ────────────────────
+  const gracefulDisconnect = useCallback(() => {
+    const conn = connectionRef.current;
+    if (!conn) return;
+
+    // Use sendBeacon as a last-resort signal if the hub supports it via REST,
+    // but primarily just call stop() which sends a close frame.
+    try {
+      conn.stop();
+    } catch {
+      // Best-effort on unload – swallow
+    }
+  }, []);
 
   // Login
   const login = useCallback(async (username) => {
@@ -38,6 +101,7 @@ export function useChat() {
       }
       const data = await res.json();
       setToken(data.token);
+      tokenRef.current = data.token;
       setUser(data.username);
       sessionStorage.setItem('echoroom_session', JSON.stringify({ token: data.token, username: data.username }));
       return data;
@@ -49,8 +113,11 @@ export function useChat() {
 
   // Connect SignalR
   const connectHub = useCallback(async (jwtToken) => {
+    // Stop any previous heartbeat
+    stopHeartbeat();
+
     if (connectionRef.current) {
-      await connectionRef.current.stop();
+      try { await connectionRef.current.stop(); } catch { /* ignore */ }
     }
 
     const connection = new signalR.HubConnectionBuilder()
@@ -136,26 +203,39 @@ export function useChat() {
     // Session replaced
     connection.on('SessionReplaced', (message) => {
       setSessionReplaced(true);
+      stopHeartbeat();
       connection.stop();
     });
 
     // Connection state
-    connection.onreconnecting(() => setConnectionStatus('reconnecting'));
-    connection.onreconnected(() => setConnectionStatus('connected'));
-    connection.onclose(() => setConnectionStatus('disconnected'));
+    connection.onreconnecting(() => {
+      setConnectionStatus('reconnecting');
+      stopHeartbeat();          // pause heartbeat while reconnecting
+    });
+    connection.onreconnected(() => {
+      setConnectionStatus('connected');
+      startHeartbeat();         // resume heartbeat after reconnect
+    });
+    connection.onclose(() => {
+      setConnectionStatus('disconnected');
+      stopHeartbeat();
+    });
 
     try {
       setConnectionStatus('connecting');
       await connection.start();
       setConnectionStatus('connected');
       connectionRef.current = connection;
+
+      // Start heartbeat loop on successful connection
+      startHeartbeat();
     } catch (err) {
       setConnectionStatus('disconnected');
       setError('Failed to connect to chat server. Retrying...');
       // Retry after delay
       setTimeout(() => connectHub(jwtToken), 5000);
     }
-  }, []);
+  }, [startHeartbeat, stopHeartbeat]);
 
   // Send group message
   const sendGroupMessage = useCallback(async (message) => {
@@ -222,11 +302,13 @@ export function useChat() {
 
   // Logout
   const logout = useCallback(async () => {
+    stopHeartbeat();
     if (connectionRef.current) {
-      await connectionRef.current.stop();
+      try { await connectionRef.current.stop(); } catch { /* ignore */ }
       connectionRef.current = null;
     }
     sessionStorage.removeItem('echoroom_session');
+    tokenRef.current = null;
     setUser(null);
     setToken(null);
     setActiveUsers([]);
@@ -239,7 +321,7 @@ export function useChat() {
     setError(null);
     setSessionReplaced(false);
     setUnreadPrivate({});
-  }, []);
+  }, [stopHeartbeat]);
 
   // Auto-reconnect from saved session on mount
   useEffect(() => {
@@ -249,9 +331,63 @@ export function useChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Page lifecycle: clean disconnect on every possible exit ───
+  useEffect(() => {
+    // beforeunload — desktop browsers, tab close, navigation away
+    const onBeforeUnload = () => {
+      gracefulDisconnect();
+    };
+
+    // pagehide — more reliable than beforeunload on mobile Safari / iOS
+    const onPageHide = (e) => {
+      // persisted = bfcache; still attempt stop
+      gracefulDisconnect();
+    };
+
+    // visibilitychange — handles mobile tab switches, app backgrounding
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Pause heartbeat when tab is hidden (saves resources)
+        stopHeartbeat();
+      } else if (document.visibilityState === 'visible') {
+        const conn = connectionRef.current;
+        if (conn && conn.state === signalR.HubConnectionState.Connected) {
+          // Tab is back — resume heartbeat and send an immediate one
+          startHeartbeat();
+          conn.invoke('Heartbeat').catch(() => {});
+        } else if (conn && conn.state === signalR.HubConnectionState.Disconnected) {
+          // Connection died while hidden — attempt fresh reconnect
+          const savedToken = tokenRef.current;
+          if (savedToken) {
+            connectHub(savedToken);
+          }
+        }
+      }
+    };
+
+    // freeze — fired on some browsers when page is about to be frozen (e.g., bfcache)
+    const onFreeze = () => {
+      gracefulDisconnect();
+      stopHeartbeat();
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('freeze', onFreeze);
+
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      document.removeEventListener('freeze', onFreeze);
+    };
+  }, [gracefulDisconnect, stopHeartbeat, startHeartbeat, connectHub]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      stopHeartbeat();
       if (connectionRef.current) {
         connectionRef.current.stop();
       }
@@ -260,6 +396,7 @@ export function useChat() {
         clearTimeout(privateTypingTimeoutRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
