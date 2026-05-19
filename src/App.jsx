@@ -43,6 +43,19 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} error={chat.error} />;
   }
 
+  // Connecting loader — shown until SignalR is ready
+  if (chat.connectionStatus !== 'connected') {
+    return (
+      <div className="connecting-screen">
+        <div className="connecting-card animate-fade">
+          <div className="connecting-spinner" />
+          <h2>Connecting to EchoRoom...</h2>
+          <p>Setting up your real-time session</p>
+        </div>
+      </div>
+    );
+  }
+
   // Main chat layout
   return (
     <div className="app-layout">
@@ -78,6 +91,7 @@ export default function App() {
           currentUser={chat.user}
           onSelectUser={handleSelectUser}
           privateChatUser={chat.privateChatUser}
+          unreadPrivate={chat.unreadPrivate}
         />
         <GroupChat
           messages={chat.groupMessages}

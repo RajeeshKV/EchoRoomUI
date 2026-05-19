@@ -3,8 +3,12 @@ import * as signalR from '@microsoft/signalr';
 import { config } from '../config';
 
 export function useChat() {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
+  // Restore session from storage
+  const stored = sessionStorage.getItem('echoroom_session');
+  const initial = stored ? JSON.parse(stored) : {};
+
+  const [user, setUser] = useState(initial.username || null);
+  const [token, setToken] = useState(initial.token || null);
   const [activeUsers, setActiveUsers] = useState([]);
   const [groupMessages, setGroupMessages] = useState([]);
   const [privateMessages, setPrivateMessages] = useState([]);
@@ -35,6 +39,7 @@ export function useChat() {
       const data = await res.json();
       setToken(data.token);
       setUser(data.username);
+      sessionStorage.setItem('echoroom_session', JSON.stringify({ token: data.token, username: data.username }));
       return data;
     } catch (err) {
       setError(err.message);
@@ -171,6 +176,8 @@ export function useChat() {
       setPrivateMessages([]);
       return;
     }
+    // Block self-DM
+    if (username === user) return;
     if (connectionRef.current) {
       try {
         setPrivateChatUser(username);
@@ -219,6 +226,7 @@ export function useChat() {
       await connectionRef.current.stop();
       connectionRef.current = null;
     }
+    sessionStorage.removeItem('echoroom_session');
     setUser(null);
     setToken(null);
     setActiveUsers([]);
@@ -231,6 +239,14 @@ export function useChat() {
     setError(null);
     setSessionReplaced(false);
     setUnreadPrivate({});
+  }, []);
+
+  // Auto-reconnect from saved session on mount
+  useEffect(() => {
+    if (initial.token && initial.username && !connectionRef.current) {
+      connectHub(initial.token);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cleanup on unmount
