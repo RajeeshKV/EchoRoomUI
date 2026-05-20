@@ -21,9 +21,8 @@ export default function App() {
   };
 
   const handleClosePrivate = () => {
-    // Clear the private chat selection (no hub method needed)
+    // Clear the private chat selection — returns to contact list
     chat.joinPrivateRoom(null);
-    setMobileTab('users'); // go back to users list on mobile
   };
 
   // Total unread count for the private tab badge
@@ -121,6 +120,10 @@ export default function App() {
             onTyping={chat.sendTyping}
             typingUser={chat.privateTypingUser}
             onClose={handleClosePrivate}
+            users={chat.activeUsers}
+            onSelectUser={handleSelectUser}
+            unreadPrivate={chat.unreadPrivate}
+            recentContacts={chat.recentContacts}
           />
         </div>
       </main>

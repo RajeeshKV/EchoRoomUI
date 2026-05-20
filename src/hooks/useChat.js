@@ -6,6 +6,41 @@ import { config } from '../config';
 const HEARTBEAT_INTERVAL_MS = 25_000;   // send heartbeat every 25 s
 const FREEZE_THRESHOLD_MS   = 60_000;   // if loop was frozen > 60 s → reconnect
 
+// ── Helpers: load/save recent contacts from localStorage ─────
+function loadRecentContacts(username) {
+  try {
+    const raw = localStorage.getItem(`echoroom_recent_${username}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveRecentContacts(username, contacts) {
+  try {
+    localStorage.setItem(`echoroom_recent_${username}`, JSON.stringify(contacts));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+/**
+ * Upsert a contact into the recent list.
+ * Returns a new array (does NOT mutate).
+ */
+function upsertContact(list, partner, preview, timestamp) {
+  const existing = list.find((c) => c.username === partner);
+  const ts = timestamp ? new Date(timestamp).getTime() : Date.now();
+  if (existing) {
+    // Only update if the new message is newer
+    if (ts >= existing.lastTime) {
+      return list.map((c) =>
+        c.username === partner
+          ? { ...c, lastMessage: preview, lastTime: ts }
+          : c
+      );
+    }
+    return list;
+  }
+  return [...list, { username: partner, lastMessage: preview, lastTime: ts }];
+}
+
 export function useChat() {
   // Restore session from storage
   const stored = sessionStorage.getItem('echoroom_session');
@@ -23,12 +58,14 @@ export function useChat() {
   const [error, setError] = useState(null);
   const [sessionReplaced, setSessionReplaced] = useState(false);
   const [unreadPrivate, setUnreadPrivate] = useState({});
+  const [recentContacts, setRecentContacts] = useState(() => loadRecentContacts(initial.username));
   const connectionRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const privateTypingTimeoutRef = useRef(null);
   const heartbeatRef = useRef(null);
   const lastHeartbeatTsRef = useRef(Date.now());
   const tokenRef = useRef(initial.token || null);   // stable ref for event handlers
+  const userRef = useRef(initial.username || null); // stable ref for the current username
 
   // ── Helpers: stop heartbeat ───────────────────────────────────
   const stopHeartbeat = useCallback(() => {
@@ -103,7 +140,10 @@ export function useChat() {
       setToken(data.token);
       tokenRef.current = data.token;
       setUser(data.username);
+      userRef.current = data.username;
       sessionStorage.setItem('echoroom_session', JSON.stringify({ token: data.token, username: data.username }));
+      // Load persisted recent contacts for this user
+      setRecentContacts(loadRecentContacts(data.username));
       return data;
     } catch (err) {
       setError(err.message);
@@ -141,6 +181,18 @@ export function useChat() {
         const sender = message.sender;
         return { ...prev, [sender]: (prev[sender] || 0) + 1 };
       });
+
+      // Update recent contacts list
+      const me = userRef.current;
+      const partner = message.sender === me ? message.receiver : message.sender;
+      if (partner && partner !== me) {
+        const preview = message.content || message.text || '';
+        setRecentContacts((prev) => {
+          const next = upsertContact(prev, partner, preview, message.timestamp);
+          saveRecentContacts(me, next);
+          return next;
+        });
+      }
     });
 
     // Bootstrap public history
@@ -267,6 +319,17 @@ export function useChat() {
           delete next[username];
           return next;
         });
+
+        // Ensure this user is in recent contacts
+        const me = userRef.current;
+        setRecentContacts((prev) => {
+          const exists = prev.find((c) => c.username === username);
+          if (exists) return prev;
+          const next = [...prev, { username, lastMessage: '', lastTime: Date.now() }];
+          saveRecentContacts(me, next);
+          return next;
+        });
+
         await connectionRef.current.invoke('JoinPrivateRoom', username);
       } catch (err) {
         setError('Failed to join private room');
@@ -278,7 +341,18 @@ export function useChat() {
   const sendPrivateMessage = useCallback(async (receiverUsername, message) => {
     if (connectionRef.current && message.trim()) {
       try {
-        await connectionRef.current.invoke('SendPrivateMessage', receiverUsername, message.trim().slice(0, 500));
+        const trimmed = message.trim().slice(0, 500);
+        await connectionRef.current.invoke('SendPrivateMessage', receiverUsername, trimmed);
+
+        // Update recent contacts with the sent message
+        const me = userRef.current;
+        if (me && receiverUsername) {
+          setRecentContacts((prev) => {
+            const next = upsertContact(prev, receiverUsername, trimmed, new Date().toISOString());
+            saveRecentContacts(me, next);
+            return next;
+          });
+        }
       } catch (err) {
         setError('Failed to send private message');
       }
@@ -309,6 +383,7 @@ export function useChat() {
     }
     sessionStorage.removeItem('echoroom_session');
     tokenRef.current = null;
+    userRef.current = null;
     setUser(null);
     setToken(null);
     setActiveUsers([]);
@@ -321,6 +396,7 @@ export function useChat() {
     setError(null);
     setSessionReplaced(false);
     setUnreadPrivate({});
+    setRecentContacts([]);
   }, [stopHeartbeat]);
 
   // Auto-reconnect from saved session on mount
@@ -412,6 +488,7 @@ export function useChat() {
     error,
     sessionReplaced,
     unreadPrivate,
+    recentContacts,
     login,
     connectHub,
     sendGroupMessage,
