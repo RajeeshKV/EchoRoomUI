@@ -44,3 +44,13 @@
   text-align: right;
 }
 .msg-bubble--own .msg-time { color: rgba(255,255,255,0.5); }
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .msg-bubble {
+    max-width: 85%;
+  }
+  .msg-avatar-spacer {
+    width: 26px;
+  }
+}

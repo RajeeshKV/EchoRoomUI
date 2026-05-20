@@ -113,3 +113,24 @@
 .au-user--unread {
   background: var(--accent-subtle);
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .active-users {
+    border-right: none;
+  }
+  .au-header {
+    padding: 16px 16px 12px;
+  }
+  .au-user {
+    padding: 12px 14px;
+    gap: 12px;
+    min-height: 48px;
+  }
+  .au-username {
+    font-size: 15px;
+  }
+  .au-footer {
+    padding: 12px 14px;
+  }
+}

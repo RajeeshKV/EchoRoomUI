@@ -39,3 +39,19 @@
   transform: scale(1.05);
 }
 .chat-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .chat-input {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .chat-input input {
+    padding: 10px 14px;
+    font-size: 15px; /* prevent iOS zoom */
+  }
+  .chat-input button {
+    width: 40px;
+    height: 40px;
+  }
+}

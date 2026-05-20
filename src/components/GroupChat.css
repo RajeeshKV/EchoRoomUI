@@ -66,3 +66,23 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .group-chat {
+    border-right: none;
+  }
+  .gc-header {
+    padding: 12px 14px;
+  }
+  .gc-title {
+    font-size: 15px;
+  }
+  .gc-status {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .gc-messages {
+    padding: 12px 14px;
+  }
+}

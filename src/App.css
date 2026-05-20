@@ -1,5 +1,6 @@
 .app-layout {
   height: 100vh;
+  height: 100dvh; /* dynamic viewport height for mobile browsers */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -48,6 +49,19 @@
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
+}
+
+/* Panel wrappers — on desktop, just pass through */
+.panel-users,
+.panel-group,
+.panel-private {
+  display: contents;
+}
+
+/* ===== Mobile Bottom Navigation ===== */
+.mobile-nav {
+  display: none;
 }
 
 /* ===== Error Toast ===== */
@@ -67,21 +81,25 @@
   align-items: center;
   gap: 12px;
   box-shadow: var(--shadow-lg);
+  max-width: calc(100vw - 32px);
 }
 .error-toast button {
   color: rgba(255,255,255,0.7);
   font-size: 16px;
   transition: color var(--transition);
+  flex-shrink: 0;
 }
 .error-toast button:hover { color: white; }
 
 /* ===== Session Replaced ===== */
 .session-replaced {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-primary);
+  padding: 20px;
 }
 .sr-card {
   background: var(--bg-secondary);
@@ -90,6 +108,7 @@
   padding: 40px;
   text-align: center;
   max-width: 400px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -113,6 +132,7 @@
 /* ===== Connecting Loader ===== */
 .connecting-screen {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -146,7 +166,9 @@
   to { transform: rotate(360deg); }
 }
 
-/* ===== Responsive ===== */
+/* =============================================
+   RESPONSIVE: Tablet (narrow 3-panel)
+   ============================================= */
 @media (max-width: 900px) {
   .active-users { width: 60px; min-width: 60px; }
   .au-header, .au-footer .au-current, .au-username { display: none; }
@@ -154,6 +176,172 @@
   .au-user { justify-content: center; padding: 8px; }
   .private-chat { width: 260px; min-width: 200px; }
 }
+
+/* =============================================
+   RESPONSIVE: Mobile (<= 640px)
+   ============================================= */
 @media (max-width: 640px) {
-  .private-chat { display: none; }
+  /* Header adjustments */
+  .app-header {
+    padding: 8px 14px;
+  }
+  .app-header-title {
+    font-size: 16px;
+  }
+  .app-logout {
+    padding: 8px;
+    gap: 0;
+  }
+  .logout-text {
+    display: none;
+  }
+
+  /* Main area fills between header and bottom nav */
+  .app-main {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Panels become full-size overlays, toggled by .panel--active */
+  .panel-users,
+  .panel-group,
+  .panel-private {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  .panel--active {
+    display: flex !important;
+  }
+
+  /* Force child components to fill their panel wrapper */
+  .panel-users > .active-users,
+  .panel-group > .group-chat,
+  .panel-private > .private-chat {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 100%;
+    border: none !important;
+  }
+
+  /* Restore active-users full layout on mobile (undo tablet collapse) */
+  .active-users {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .au-header { display: block !important; }
+  .au-username { display: inline !important; }
+  .au-footer .au-current { display: inline !important; }
+  .au-footer { justify-content: flex-start !important; }
+  .au-user { justify-content: flex-start !important; padding: 10px 12px !important; }
+
+  /* Private chat fills entirely */
+  .private-chat {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-left: none !important;
+  }
+
+  /* Group chat takes full width */
+  .group-chat {
+    border-right: none !important;
+  }
+
+  /* ===== Mobile Bottom Navigation ===== */
+  .mobile-nav {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    padding: 4px 0;
+    padding-bottom: env(safe-area-inset-bottom, 4px);
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    transition: color var(--transition), background var(--transition);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-nav-item:active {
+    background: var(--bg-hover);
+  }
+  .mobile-nav-item--active {
+    color: var(--accent);
+  }
+  .mobile-nav-item--active svg {
+    filter: drop-shadow(0 0 6px var(--accent-glow));
+  }
+
+  /* Online dot indicator for users tab */
+  .mobile-nav-dot {
+    position: absolute;
+    top: 5px;
+    right: calc(50% - 18px);
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--green-glow);
+    border: 1.5px solid var(--bg-secondary);
+  }
+
+  /* Unread badge on private tab */
+  .mobile-nav-badge {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 22px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--bg-secondary);
+    box-shadow: 0 0 6px var(--accent-glow);
+  }
+}
+
+/* =============================================
+   RESPONSIVE: Small mobile (<= 380px)
+   ============================================= */
+@media (max-width: 380px) {
+  .app-header {
+    padding: 6px 10px;
+  }
+  .app-header-left svg {
+    width: 20px;
+    height: 20px;
+  }
+  .app-header-title {
+    font-size: 15px;
+  }
+  .gc-messages, .pc-messages {
+    padding: 10px 12px;
+  }
+  .chat-input {
+    padding: 10px 12px;
+  }
+  .sr-card {
+    padding: 28px 20px;
+  }
 }

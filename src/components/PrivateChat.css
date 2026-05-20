@@ -82,3 +82,30 @@
   text-align: center;
   padding: 20px;
 }
+
+/* ===== Mobile ===== */
+@media (max-width: 640px) {
+  .private-chat {
+    border-left: none;
+  }
+  .pc-header {
+    padding: 12px 14px;
+  }
+  .pc-close {
+    width: 36px;
+    height: 36px;
+  }
+  .pc-messages {
+    padding: 12px 14px;
+  }
+  .pc-empty {
+    padding: 40px 24px;
+  }
+  .pc-empty h3 {
+    font-size: 18px;
+  }
+  .pc-empty p {
+    font-size: 14px;
+    max-width: 260px;
+  }
+}
