@@ -3,16 +3,31 @@
   gap: 8px;
   align-items: flex-end;
   animation: fadeIn 0.2s ease;
+  margin-bottom: 8px;
+  position: relative;
 }
 .msg-row--own { flex-direction: row-reverse; }
 .msg-avatar-spacer { width: 32px; flex-shrink: 0; }
 
-.msg-bubble {
+.msg-bubble-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
   max-width: 70%;
+  width: auto;
+}
+.msg-row--own .msg-bubble-wrapper {
+  flex-direction: row-reverse;
+}
+
+.msg-bubble {
   padding: 10px 14px;
   background: var(--surface);
   border-radius: 16px 16px 16px 4px;
   position: relative;
+  min-width: 60px;
+  max-width: 100%;
 }
 .msg-bubble--own {
   background: var(--accent);
@@ -26,7 +41,7 @@
   color: var(--accent);
   margin-bottom: 2px;
 }
-.msg-bubble--own .msg-sender { color: rgba(255,255,255,0.7); }
+.msg-bubble--own .msg-sender { color: rgba(255,255,255,0.8); }
 
 .msg-text {
   font-size: 14px;
@@ -45,12 +60,267 @@
 }
 .msg-bubble--own .msg-time { color: rgba(255,255,255,0.5); }
 
+/* ===== Reply Button on Hover ===== */
+.msg-bubble-reply-btn {
+  opacity: 0;
+  transition: opacity var(--transition), transform var(--transition);
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.msg-bubble-wrapper:hover .msg-bubble-reply-btn {
+  opacity: 1;
+}
+.msg-bubble-reply-btn:hover {
+  background: var(--border-light);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+/* ===== Reply Reference inside Bubble ===== */
+.msg-reply-ref {
+  display: flex;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background var(--transition);
+  min-width: 120px;
+}
+.msg-reply-ref:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+.reply-ref-border {
+  width: 3px;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.reply-ref-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.reply-ref-sender {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.msg-bubble--own .reply-ref-sender {
+  color: #fff;
+}
+.reply-ref-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-bubble--own .reply-ref-text {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ===== Highlight Flash Animation ===== */
+@keyframes msgHighlightFlash {
+  0% { box-shadow: 0 0 0px transparent; }
+  25% { box-shadow: 0 0 15px var(--accent-hover), 0 0 25px var(--accent); transform: scale(1.02); }
+  100% { box-shadow: 0 0 0px transparent; }
+}
+.msg-highlight-flash .msg-bubble {
+  animation: msgHighlightFlash 1.5s ease-out;
+}
+
+/* ===== Attachments Style ===== */
+.msg-attachment {
+  margin-bottom: 6px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* Images */
+.msg-attachment--image {
+  max-width: 250px;
+  aspect-ratio: 16/10;
+  min-height: 100px;
+  cursor: pointer;
+  background: var(--bg-primary);
+}
+.msg-img-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition);
+  display: block;
+}
+.msg-img-thumb:hover {
+  transform: scale(1.02);
+}
+
+/* Lightbox Modal */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(8px);
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition);
+}
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.lightbox-image {
+  max-width: 90%;
+  max-height: 85%;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+}
+
+/* Videos */
+.msg-attachment--video {
+  max-width: 280px;
+  background: var(--bg-primary);
+}
+.msg-video-player {
+  width: 100%;
+  max-height: 200px;
+  display: block;
+  border-radius: var(--radius-md);
+}
+
+/* Voice Notes (Custom Audio Player) */
+.msg-attachment--voice {
+  background: rgba(0,0,0,0.12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  width: 230px;
+  max-width: 100%;
+}
+.custom-audio-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.audio-play-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition), transform var(--transition);
+}
+.audio-play-btn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+.msg-bubble--own .audio-play-btn {
+  background: white;
+  color: var(--accent);
+}
+.msg-bubble--own .audio-play-btn:hover {
+  background: rgba(255,255,255,0.9);
+}
+.audio-slider-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.audio-progress-bar {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.msg-bubble--own .audio-progress-bar {
+  accent-color: white;
+}
+.audio-time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.msg-bubble--own .audio-time-row {
+  color: rgba(255,255,255,0.6);
+}
+
+/* Generic Attachment Link */
+.generic-attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: background var(--transition);
+}
+.generic-attachment-link:hover {
+  background: var(--border);
+}
+
 /* ===== Mobile ===== */
 @media (max-width: 640px) {
-  .msg-bubble {
+  .msg-bubble-wrapper {
     max-width: 85%;
   }
   .msg-avatar-spacer {
     width: 26px;
   }
+  .msg-attachment--image {
+    max-width: 200px;
+  }
+  .msg-attachment--video {
+    max-width: 220px;
+  }
+  .msg-attachment--voice {
+    width: 180px;
+  }
+  .msg-bubble-reply-btn {
+    width: 26px;
+    height: 26px;
+  }
 }
+

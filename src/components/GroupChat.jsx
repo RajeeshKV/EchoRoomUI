@@ -1,17 +1,31 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import TypingIndicator from './TypingIndicator';
 import './GroupChat.css';
 
-export default function GroupChat({ messages, currentUser, onSend, onTyping, typingUsers, connectionStatus }) {
+export default function GroupChat({
+  messages,
+  currentUser,
+  onSend,
+  onTyping,
+  typingUsers,
+  connectionStatus,
+  uploadMedia,
+}) {
   const listRef = useRef(null);
+  const [replyingTo, setReplyingTo] = useState(null);
 
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages, typingUsers]);
+
+  const handleSend = (text, attachment, replyToId) => {
+    onSend(text, attachment, replyToId);
+    setReplyingTo(null);
+  };
 
   return (
     <section className="group-chat">
@@ -44,16 +58,27 @@ export default function GroupChat({ messages, currentUser, onSend, onTyping, typ
         {messages.map((msg, i) => {
           const isOwn = msg.sender === currentUser;
           const showSender = !isOwn && (i === 0 || messages[i - 1]?.sender !== msg.sender);
-          return <MessageBubble key={i} message={msg} isOwn={isOwn} showSender={showSender} />;
+          return (
+            <MessageBubble
+              key={msg.id || i}
+              message={msg}
+              isOwn={isOwn}
+              showSender={showSender}
+              onReply={setReplyingTo}
+            />
+          );
         })}
       </div>
 
       <TypingIndicator users={typingUsers.filter((u) => u !== currentUser)} />
       <ChatInput
-        onSend={onSend}
+        onSend={handleSend}
         onTyping={() => onTyping()}
         placeholder="Message the group..."
         disabled={connectionStatus !== 'connected'}
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
+        uploadMedia={uploadMedia}
       />
     </section>
   );

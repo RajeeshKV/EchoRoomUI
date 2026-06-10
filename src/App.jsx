@@ -109,6 +109,7 @@ export default function App() {
             onTyping={chat.sendTyping}
             typingUsers={chat.typingUsers}
             connectionStatus={chat.connectionStatus}
+            uploadMedia={chat.uploadMedia}
           />
         </div>
         <div className={`panel-private ${mobileTab === 'private' ? 'panel--active' : ''}`}>
@@ -124,6 +125,7 @@ export default function App() {
             onSelectUser={handleSelectUser}
             unreadPrivate={chat.unreadPrivate}
             recentContacts={chat.recentContacts}
+            uploadMedia={chat.uploadMedia}
           />
         </div>
       </main>

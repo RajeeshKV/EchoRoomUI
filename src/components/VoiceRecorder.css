@@ -1,0 +1,135 @@
+.voice-recorder-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  gap: 16px;
+}
+
+.recorder-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--red);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--red);
+  animation: pulse 1s infinite;
+}
+
+.recorder-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.recorder-time {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--border);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* Waveform Bounce */
+.voice-waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  flex: 1;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  animation: bounceHeight 1.2s ease-in-out infinite alternate;
+}
+
+.bar-1 { height: 4px; animation-delay: 0.1s; }
+.bar-2 { height: 12px; animation-delay: 0.3s; }
+.bar-3 { height: 18px; animation-delay: 0.5s; }
+.bar-4 { height: 8px; animation-delay: 0.2s; }
+.bar-5 { height: 22px; animation-delay: 0.4s; }
+
+@keyframes bounceHeight {
+  from {
+    transform: scaleY(0.5);
+    background: var(--accent);
+  }
+  to {
+    transform: scaleY(1.5);
+    background: var(--accent-hover);
+  }
+}
+
+.recorder-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.recorder-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), transform var(--transition);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+}
+
+.recorder-btn:hover {
+  transform: scale(1.1);
+  color: var(--text-primary);
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--red);
+  border-color: rgba(255, 71, 87, 0.3);
+}
+
+.btn-stop {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+
+.btn-stop:hover {
+  background: var(--accent-hover);
+  color: white;
+}
+
+/* Responsive adjustment */
+@media (max-width: 640px) {
+  .voice-recorder-bar {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+  .voice-waveform {
+    display: none; /* Hide waveform on very small screens to fit text and actions */
+  }
+  .recorder-label {
+    display: none;
+  }
+}

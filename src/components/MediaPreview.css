@@ -1,0 +1,116 @@
+.media-preview-container {
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+}
+
+.media-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 8px 12px;
+  position: relative;
+  min-width: 200px;
+  max-width: 350px;
+  overflow: hidden;
+}
+
+.media-preview-thumbnail {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.media-preview-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.media-preview-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0; /* allows text truncation */
+  flex: 1;
+}
+
+.media-preview-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-preview-size {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.media-preview-remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.media-preview-remove:hover {
+  background: rgba(255, 71, 87, 0.15);
+  color: var(--red);
+  border-color: rgba(255, 71, 87, 0.3);
+}
+
+/* Uploading Overlay */
+.media-preview-uploading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 22, 30, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  backdrop-filter: blur(2px);
+}
+
+.uploading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.uploading-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

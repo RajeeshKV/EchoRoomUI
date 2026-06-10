@@ -209,9 +209,15 @@ export function useChat() {
       const me = userRef.current;
       const partner = message.sender === me ? message.receiver : message.sender;
       if (partner && partner !== me) {
-        const preview = message.content || message.text || '';
+        let preview = message.message || message.content || message.text || '';
+        if (message.attachment) {
+          const kind = message.attachment.kind;
+          const icon = kind === 'image' ? '📷' : kind === 'video' ? '🎥' : '🎤';
+          preview = preview ? `${icon} ${preview}` : `${icon} ${kind}`;
+        }
+        const timestamp = message.sentAt || message.timestamp;
         setRecentContacts((prev) => {
-          const next = upsertContact(prev, partner, preview, message.timestamp);
+          const next = upsertContact(prev, partner, preview, timestamp);
           saveRecentContacts(me, next);
           return next;
         });
@@ -320,11 +326,46 @@ export function useChat() {
     }
   }, [startHeartbeat, stopHeartbeat]);
 
-  // Send group message
-  const sendGroupMessage = useCallback(async (message) => {
-    if (connectionRef.current && message.trim()) {
+  // Media Upload Endpoint
+  const uploadMedia = useCallback(async (file, kind) => {
+    const jwt = tokenRef.current;
+    if (!jwt) throw new Error('Not authenticated');
+
+    const formData = new FormData();
+    formData.append('File', file);
+    formData.append('Kind', kind);
+
+    const res = await fetch(`${config.API_BASE_URL}/api/chat/media/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jwt}`
+      },
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || 'Upload failed');
+    }
+
+    const data = await res.json();
+    return data.attachment; // returns the ChatAttachmentDto
+  }, []);
+
+  // Send group message (supports Rich Messages)
+  const sendGroupMessage = useCallback(async (message, attachment = null, replyToMessageId = null) => {
+    if (connectionRef.current) {
       try {
-        await connectionRef.current.invoke('SendMessage', message.trim().slice(0, 500));
+        const hasText = message && message.trim();
+        if (attachment || replyToMessageId) {
+          await connectionRef.current.invoke('SendRichMessage', {
+            message: hasText ? message.trim().slice(0, 500) : '',
+            replyToMessageId: replyToMessageId || null,
+            attachment: attachment || null
+          });
+        } else if (hasText) {
+          await connectionRef.current.invoke('SendMessage', message.trim().slice(0, 500));
+        }
       } catch (err) {
         setError('Failed to send message');
       }
@@ -366,23 +407,48 @@ export function useChat() {
         setError('Failed to join private room');
       }
     }
-  }, []);
+  }, [user]);
 
-  // Send private message
-  const sendPrivateMessage = useCallback(async (receiverUsername, message) => {
-    if (connectionRef.current && message.trim()) {
+  // Send private message (supports Rich Messages)
+  const sendPrivateMessage = useCallback(async (receiverUsername, message, attachment = null, replyToMessageId = null) => {
+    if (connectionRef.current) {
       try {
-        const trimmed = message.trim().slice(0, 500);
-        await connectionRef.current.invoke('SendPrivateMessage', receiverUsername, trimmed);
+        const hasText = message && message.trim();
+        const trimmed = hasText ? message.trim().slice(0, 500) : '';
 
-        // Update recent contacts with the sent message
-        const me = userRef.current;
-        if (me && receiverUsername) {
-          setRecentContacts((prev) => {
-            const next = upsertContact(prev, receiverUsername, trimmed, new Date().toISOString());
-            saveRecentContacts(me, next);
-            return next;
+        if (attachment || replyToMessageId) {
+          await connectionRef.current.invoke('SendPrivateRichMessage', receiverUsername, {
+            message: trimmed,
+            replyToMessageId: replyToMessageId || null,
+            attachment: attachment || null
           });
+
+          // Update recent contacts with the sent message preview
+          const me = userRef.current;
+          if (me && receiverUsername) {
+            let preview = trimmed;
+            if (attachment) {
+              const icon = attachment.kind === 'image' ? '📷' : attachment.kind === 'video' ? '🎥' : '🎤';
+              preview = preview ? `${icon} ${preview}` : `${icon} ${attachment.kind}`;
+            }
+            setRecentContacts((prev) => {
+              const next = upsertContact(prev, receiverUsername, preview, new Date().toISOString());
+              saveRecentContacts(me, next);
+              return next;
+            });
+          }
+        } else if (hasText) {
+          await connectionRef.current.invoke('SendPrivateMessage', receiverUsername, trimmed);
+
+          // Update recent contacts with the sent message
+          const me = userRef.current;
+          if (me && receiverUsername) {
+            setRecentContacts((prev) => {
+              const next = upsertContact(prev, receiverUsername, trimmed, new Date().toISOString());
+              saveRecentContacts(me, next);
+              return next;
+            });
+          }
         }
       } catch (err) {
         setError('Failed to send private message');
@@ -531,5 +597,6 @@ export function useChat() {
     sendTyping,
     logout,
     setError,
+    uploadMedia,
   };
 }

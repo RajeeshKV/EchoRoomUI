@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import Avatar from './Avatar';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
@@ -17,8 +17,15 @@ export default function PrivateChat({
   onSelectUser,
   unreadPrivate,
   recentContacts,
+  uploadMedia,
 }) {
   const listRef = useRef(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+
+  // Clear reply state when switching chats
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [privateChatUser]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -171,6 +178,11 @@ export default function PrivateChat({
 
   const typingArr = typingUser === privateChatUser ? [typingUser] : [];
 
+  const handleSend = (text, attachment, replyToId) => {
+    onSend(privateChatUser, text, attachment, replyToId);
+    setReplyingTo(null);
+  };
+
   return (
     <aside className="private-chat">
       <div className="pc-header">
@@ -195,15 +207,26 @@ export default function PrivateChat({
         {filtered.map((msg, i) => {
           const isOwn = msg.sender === currentUser;
           const showSender = !isOwn && (i === 0 || filtered[i - 1]?.sender !== msg.sender);
-          return <MessageBubble key={i} message={msg} isOwn={isOwn} showSender={showSender} />;
+          return (
+            <MessageBubble
+              key={msg.id || i}
+              message={msg}
+              isOwn={isOwn}
+              showSender={showSender}
+              onReply={setReplyingTo}
+            />
+          );
         })}
       </div>
 
       <TypingIndicator users={typingArr} />
       <ChatInput
-        onSend={(msg) => onSend(privateChatUser, msg)}
+        onSend={handleSend}
         onTyping={() => onTyping(privateChatUser)}
         placeholder={`Message ${privateChatUser}...`}
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
+        uploadMedia={uploadMedia}
       />
     </aside>
   );
