@@ -6,6 +6,24 @@ import { config } from '../config';
 const HEARTBEAT_INTERVAL_MS = 25_000;   // send heartbeat every 25 s
 const FREEZE_THRESHOLD_MS   = 60_000;   // if loop was frozen > 60 s → reconnect
 
+// Helper to check if a JWT token is expired
+function isTokenExpired(token) {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload.exp) {
+      // payload.exp is in seconds, Date.now() is in milliseconds.
+      // Use a 10-second buffer to handle network latency or clock skew
+      return Date.now() >= (payload.exp * 1000 - 10000);
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 // ── Helpers: load/save recent contacts from localStorage ─────
 function loadRecentContacts(username) {
   try {
@@ -43,11 +61,16 @@ function upsertContact(list, partner, preview, timestamp) {
 
 export function useChat() {
   // Restore session from storage
-  const stored = sessionStorage.getItem('echoroom_session');
+  const stored = localStorage.getItem('echoroom_session');
   const initial = stored ? JSON.parse(stored) : {};
+  const isExpired = isTokenExpired(initial.token);
 
-  const [user, setUser] = useState(initial.username || null);
-  const [token, setToken] = useState(initial.token || null);
+  // If token is expired, ignore the saved session
+  const initialUsername = isExpired ? null : (initial.username || null);
+  const initialToken = isExpired ? null : (initial.token || null);
+
+  const [user, setUser] = useState(initialUsername);
+  const [token, setToken] = useState(initialToken);
   const [activeUsers, setActiveUsers] = useState([]);
   const [groupMessages, setGroupMessages] = useState([]);
   const [privateMessages, setPrivateMessages] = useState([]);
@@ -58,14 +81,14 @@ export function useChat() {
   const [error, setError] = useState(null);
   const [sessionReplaced, setSessionReplaced] = useState(false);
   const [unreadPrivate, setUnreadPrivate] = useState({});
-  const [recentContacts, setRecentContacts] = useState(() => loadRecentContacts(initial.username));
+  const [recentContacts, setRecentContacts] = useState(() => loadRecentContacts(initialUsername));
   const connectionRef = useRef(null);
   const typingTimeoutsRef = useRef({});
   const privateTypingTimeoutRef = useRef(null);
   const heartbeatRef = useRef(null);
   const lastHeartbeatTsRef = useRef(Date.now());
-  const tokenRef = useRef(initial.token || null);   // stable ref for event handlers
-  const userRef = useRef(initial.username || null); // stable ref for the current username
+  const tokenRef = useRef(initialToken);   // stable ref for event handlers
+  const userRef = useRef(initialUsername); // stable ref for the current username
 
   // ── Helpers: stop heartbeat ───────────────────────────────────
   const stopHeartbeat = useCallback(() => {
@@ -141,7 +164,7 @@ export function useChat() {
       tokenRef.current = data.token;
       setUser(data.username);
       userRef.current = data.username;
-      sessionStorage.setItem('echoroom_session', JSON.stringify({ token: data.token, username: data.username }));
+      localStorage.setItem('echoroom_session', JSON.stringify({ token: data.token, username: data.username }));
       // Load persisted recent contacts for this user
       setRecentContacts(loadRecentContacts(data.username));
       return data;
@@ -274,6 +297,10 @@ export function useChat() {
     });
 
     try {
+      if (isTokenExpired(jwtToken)) {
+        logout();
+        return;
+      }
       setConnectionStatus('connecting');
       await connection.start();
       setConnectionStatus('connected');
@@ -283,6 +310,10 @@ export function useChat() {
       startHeartbeat();
     } catch (err) {
       setConnectionStatus('disconnected');
+      if (isTokenExpired(jwtToken)) {
+        logout();
+        return;
+      }
       setError('Failed to connect to chat server. Retrying...');
       // Retry after delay
       setTimeout(() => connectHub(jwtToken), 5000);
@@ -381,7 +412,7 @@ export function useChat() {
       try { await connectionRef.current.stop(); } catch { /* ignore */ }
       connectionRef.current = null;
     }
-    sessionStorage.removeItem('echoroom_session');
+    localStorage.removeItem('echoroom_session');
     tokenRef.current = null;
     userRef.current = null;
     setUser(null);
@@ -401,8 +432,11 @@ export function useChat() {
 
   // Auto-reconnect from saved session on mount
   useEffect(() => {
-    if (initial.token && initial.username && !connectionRef.current) {
-      connectHub(initial.token);
+    if (initialToken && initialUsername && !connectionRef.current) {
+      connectHub(initialToken);
+    } else if (isExpired && stored) {
+      // Clear expired session if any
+      localStorage.removeItem('echoroom_session');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

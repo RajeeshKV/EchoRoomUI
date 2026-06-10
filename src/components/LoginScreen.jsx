@@ -9,7 +9,6 @@ export default function LoginScreen({ onLogin, error }) {
   const validate = (val) => {
     if (val.length < 3) return 'Username must be at least 3 characters';
     if (val.length > 20) return 'Username must be 20 characters or less';
-    if (!/^[a-zA-Z0-9]+$/.test(val)) return 'Only alphanumeric characters allowed';
     return '';
   };
 
@@ -47,7 +46,11 @@ export default function LoginScreen({ onLogin, error }) {
               type="text"
               placeholder="Choose a username..."
               value={username}
-              onChange={(e) => { setUsername(e.target.value); setValidationErr(''); }}
+              onChange={(e) => {
+                const filtered = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+                setUsername(filtered);
+                setValidationErr('');
+              }}
               maxLength={20}
               autoFocus
               autoComplete="off"

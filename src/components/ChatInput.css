@@ -48,7 +48,7 @@
   }
   .chat-input input {
     padding: 10px 14px;
-    font-size: 15px; /* prevent iOS zoom */
+    font-size: 16px; /* prevent iOS zoom */
   }
   .chat-input button {
     width: 40px;
